@@ -83,7 +83,7 @@
     <div class="usage muted" id="usage"></div>
   </section>
 
-  <p class="muted center foot">Visible to every device on the same Wi-Fi / network · everything auto-deletes after <span id="ttl">24</span> hours</p>
+  <p class="muted center foot">Visible to every device on the same Wi-Fi / network · everything auto-deletes after <span id="ttl">1 hour</span></p>
 </main>
 <div id="toast"></div>
 
@@ -113,7 +113,7 @@ function render() {
   } else {
     $('#textInfo').textContent = dirty ? 'Unsaved changes' : (state.textUpdated ? 'Updated ' + ago(state.textUpdated) : '');
   }
-  $('#ttl').textContent = L.ttlHours;
+  $('#ttl').textContent = L.ttlHours + (L.ttlHours === 1 ? ' hour' : ' hours');
   $('#limitsInfo').textContent = `Up to ${L.maxFiles} files at a time · ${fmt(L.maxFile)} each`;
   $('#fileCount').textContent = state.files.length || '';
   $('#empty').style.display = state.files.length ? 'none' : '';

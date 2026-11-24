@@ -6,7 +6,7 @@ No codes, no links, no accounts: open the site, then upload or download.
 - Text sharing: Save, Copy, Clear, with live updates on every device
 - Files: up to **50 MB each**, **5 at a time**, with drag-and-drop, paste and progress bars
 - Live "devices online" count (Server-Sent Events)
-- Everything auto-deletes after 24 hours
+- Everything auto-deletes after 1 hour
 - No dependencies: only Node.js 18+
 
 ## How "same network" works
@@ -38,7 +38,7 @@ On **Cloudflare**, the free plan allows 100 MB uploads, so 50 MB is fine.
 | `MAX_FILE_MB` | 50 | Max size per file |
 | `MAX_FILES_AT_ONCE` | 5 | Simultaneous uploads per device |
 | `MAX_ROOM_MB` | 500 | Total storage per network |
-| `TTL_HOURS` | 24 | Auto-delete after |
+| `TTL_HOURS` | 1 | Auto-delete after (hours) |
 | `TRUST_PROXY` | 1 | Read real IP from `X-Forwarded-For`. Set to `0` if exposed directly with no proxy |
 
 ## Files

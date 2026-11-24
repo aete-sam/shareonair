@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 50;          // per file
 const MAX_FILES_AT_ONCE = Number(process.env.MAX_FILES_AT_ONCE) || 5; // simultaneous uploads per device
 const MAX_ROOM_MB = Number(process.env.MAX_ROOM_MB) || 500;         // total storage per network
-const TTL_HOURS = Number(process.env.TTL_HOURS) || 24;              // auto-delete after
+const TTL_HOURS = Number(process.env.TTL_HOURS) || 1;               // auto-delete after
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';                // read X-Forwarded-For (needed on Render/Railway/etc.)
 const MAX_TEXT = 100000;                                            // characters
 
