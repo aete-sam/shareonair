@@ -4,7 +4,7 @@ Share text and files with every device on the same Wi-Fi / Ethernet network.
 No codes, no links, no accounts: open the site, then upload or download.
 
 - Text sharing: Save, Copy, Clear, with live updates on every device
-- Files: up to **50 MB each**, **5 at a time**, with drag-and-drop, paste and progress bars
+- Files: up to **50 MB each**, **5 at a time**, **200 MB per network**, with drag-and-drop, paste and progress bars
 - Live "devices online" count (Server-Sent Events)
 - Everything auto-deletes after 1 hour
 - No dependencies: only Node.js 18+
@@ -37,7 +37,9 @@ On **Cloudflare**, the free plan allows 100 MB uploads, so 50 MB is fine.
 | `PORT` | 3000 | Port to listen on |
 | `MAX_FILE_MB` | 50 | Max size per file |
 | `MAX_FILES_AT_ONCE` | 5 | Simultaneous uploads per device |
-| `MAX_ROOM_MB` | 500 | Total storage per network |
+| `MAX_ROOM_MB` | 200 | Total storage per network |
+| `MAX_TOTAL_MB` | 2048 | Total storage for the whole server, across all networks. Keep it below your host's free disk space |
+| `MAX_UPLOADS_TOTAL` | 20 | Simultaneous uploads for the whole server |
 | `TTL_HOURS` | 1 | Auto-delete after (hours) |
 | `TRUST_PROXY` | 1 | Read real IP from `X-Forwarded-For`. Set to `0` if exposed directly with no proxy |
 

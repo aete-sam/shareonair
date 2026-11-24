@@ -11,13 +11,16 @@ const { pipeline } = require('stream/promises');
 const PORT = Number(process.env.PORT) || 3000;
 const MAX_FILE_MB = Number(process.env.MAX_FILE_MB) || 50;          // per file
 const MAX_FILES_AT_ONCE = Number(process.env.MAX_FILES_AT_ONCE) || 5; // simultaneous uploads per device
-const MAX_ROOM_MB = Number(process.env.MAX_ROOM_MB) || 500;         // total storage per network
+const MAX_ROOM_MB = Number(process.env.MAX_ROOM_MB) || 200;         // total storage per network
+const MAX_TOTAL_MB = Number(process.env.MAX_TOTAL_MB) || 2048;      // total storage for the whole server (all networks)
+const MAX_UPLOADS_TOTAL = Number(process.env.MAX_UPLOADS_TOTAL) || 20; // simultaneous uploads for the whole server
 const TTL_HOURS = Number(process.env.TTL_HOURS) || 1;               // auto-delete after
 const TRUST_PROXY = process.env.TRUST_PROXY !== '0';                // read X-Forwarded-For (needed on Render/Railway/etc.)
 const MAX_TEXT = 100000;                                            // characters
 
 const MAX_FILE = MAX_FILE_MB * 1024 * 1024;
 const MAX_ROOM_BYTES = MAX_ROOM_MB * 1024 * 1024;
+const MAX_TOTAL_BYTES = MAX_TOTAL_MB * 1024 * 1024;
 const TTL_MS = TTL_HOURS * 3600 * 1000;
 const DATA_DIR = path.join(__dirname, 'data');
 const INDEX_HTML = path.join(__dirname, 'public', 'index.html');
@@ -60,6 +63,8 @@ function networkKey(ip) {
 // ---------- Rooms (one per network) ----------
 const rooms = new Map();
 const uploadsInProgress = new Map(); // ip -> count
+let totalBytes = 0;    // bytes stored + reserved by in-progress uploads, across all networks
+let totalUploads = 0;  // uploads in progress, across all networks
 
 function getRoom(req) {
   const id = crypto.createHash('sha256').update(networkKey(clientIp(req))).digest('hex').slice(0, 20);
@@ -129,8 +134,10 @@ async function handleUpload(req, res, room, ip) {
   if (!Number.isFinite(len) || len < 0) return refuse(req, res, 411, 'Missing file size');
   if (len > MAX_FILE) return refuse(req, res, 413, `File is larger than ${MAX_FILE_MB} MB`);
   if (room.bytes + len > MAX_ROOM_BYTES) return refuse(req, res, 507, `Network storage is full (${MAX_ROOM_MB} MB). Delete some files first.`);
+  if (totalBytes + len > MAX_TOTAL_BYTES) return refuse(req, res, 507, 'The server is full right now. Please try again in a little while.');
   const active = uploadsInProgress.get(ip) || 0;
   if (active >= MAX_FILES_AT_ONCE) return refuse(req, res, 429, `Only ${MAX_FILES_AT_ONCE} uploads at a time`);
+  if (totalUploads >= MAX_UPLOADS_TOTAL) return refuse(req, res, 503, 'The server is busy. Please try again in a moment.');
 
   let name = 'file';
   try { name = decodeURIComponent(req.headers['x-file-name'] || 'file'); } catch {}
@@ -138,6 +145,8 @@ async function handleUpload(req, res, room, ip) {
 
   // Reserve the slot and the space before any await, so parallel requests can't slip past the limits.
   room.bytes += len;
+  totalBytes += len;
+  totalUploads++;
   uploadsInProgress.set(ip, active + 1);
 
   const id = crypto.randomBytes(9).toString('base64url');
@@ -148,7 +157,8 @@ async function handleUpload(req, res, room, ip) {
     if (released) return; released = true;
     const n = (uploadsInProgress.get(ip) || 1) - 1;
     n ? uploadsInProgress.set(ip, n) : uploadsInProgress.delete(ip);
-    if (!ok) room.bytes -= len;
+    totalUploads--;
+    if (!ok) { room.bytes -= len; totalBytes -= len; }
   };
 
   let received = 0;
@@ -193,6 +203,7 @@ async function deleteFile(room, id) {
   if (!f) return false;
   room.files.delete(id);
   room.bytes -= f.size;
+  totalBytes -= f.size;
   await fsp.unlink(f.path).catch(() => {});
   return true;
 }
@@ -270,7 +281,8 @@ async function cleanup() {
     for (const f of [...room.files.values()]) if (f.uploaded < cutoff) { await deleteFile(room, f.id); changed = true; }
     if (room.text && room.textUpdated < cutoff) { room.text = ''; changed = true; }
     if (changed) broadcast(room);
-    if (!room.files.size && !room.text && !room.clients.size) {
+    // room.bytes > 0 with no files means an upload is still running — keep the room until it finishes.
+    if (!room.files.size && !room.bytes && !room.text && !room.clients.size) {
       rooms.delete(room.id);
       fsp.rm(path.join(DATA_DIR, room.id), { recursive: true, force: true }).catch(() => {});
     }
