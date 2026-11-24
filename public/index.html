@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ShareOnAir — share over the same Wi-Fi</title>
+<style>
+  :root{--bg:#f4f6fb;--card:#fff;--ink:#14182b;--muted:#6b7190;--line:#e3e6f0;--brand:#3d5afe;--brand2:#e9edff;--ok:#16a34a;--bad:#dc2626}
+  @media (prefers-color-scheme:dark){:root{--bg:#0e1020;--card:#171a2e;--ink:#eceefa;--muted:#9096b5;--line:#2a2e48;--brand:#7c8cff;--brand2:#22274a}}
+  *{box-sizing:border-box}
+  body{margin:0;font:15px/1.5 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+  header{display:flex;justify-content:space-between;align-items:center;max-width:760px;margin:0 auto;padding:18px 16px}
+  .brand{font-weight:800;font-size:22px;letter-spacing:-.5px}.brand span{color:var(--brand)}
+  .status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+  .status i{width:9px;height:9px;border-radius:50%;background:var(--bad)}.status.on i{background:var(--ok)}
+  main{max-width:760px;margin:0 auto;padding:0 16px 32px}
+  .tabs{display:flex;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:5px;margin-bottom:14px}
+  .tabs button{flex:1;border:0;background:none;color:var(--muted);font:600 15px system-ui;padding:10px;border-radius:10px;cursor:pointer}
+  .tabs button.active{background:var(--brand2);color:var(--brand)}
+  .tabs b{font-size:12px;background:var(--brand);color:#fff;border-radius:99px;padding:1px 7px;margin-left:4px}
+  .tabs b:empty{display:none}
+  .panel{display:none;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px}
+  .panel.active{display:block}
+  textarea{width:100%;min-height:260px;resize:vertical;border:1px solid var(--line);border-radius:12px;padding:12px;font:15px/1.5 ui-monospace,Menlo,Consolas,monospace;background:var(--bg);color:var(--ink)}
+  textarea:focus{outline:2px solid var(--brand);border-color:transparent}
+  .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:10px;flex-wrap:wrap}
+  .btns{display:flex;gap:8px}
+  button.primary,button.ghost{border-radius:10px;padding:9px 16px;font:600 14px system-ui;cursor:pointer}
+  .primary{background:var(--brand);color:#fff;border:0}.primary:disabled{opacity:.5}
+  .ghost{background:none;color:var(--ink);border:1px solid var(--line)}
+  .muted{color:var(--muted);font-size:13px}.center{text-align:center}
+  .drop{display:flex;flex-direction:column;align-items:center;gap:4px;border:2px dashed var(--line);border-radius:14px;padding:34px 16px;cursor:pointer;text-align:center;transition:.15s}
+  .drop:hover,.drop.over{border-color:var(--brand);background:var(--brand2)}
+  .drop svg{width:34px;height:34px;color:var(--brand);margin-bottom:4px}
+  ul{list-style:none;margin:12px 0 0;padding:0}
+  .item{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+  .item:last-child{border-bottom:0}
+  .ico{flex:none;width:38px;height:38px;border-radius:10px;background:var(--brand2);color:var(--brand);display:grid;place-items:center;font:700 10px system-ui;text-transform:uppercase}
+  .meta{flex:1;min-width:0}.name{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .acts{display:flex;gap:6px}
+  .acts a,.acts button{border:1px solid var(--line);background:none;color:var(--ink);border-radius:9px;padding:7px 11px;font:600 13px system-ui;cursor:pointer;text-decoration:none}
+  .acts a{background:var(--brand);color:#fff;border-color:var(--brand)}
+  .bar{height:6px;background:var(--line);border-radius:9px;overflow:hidden;margin-top:6px}.bar i{display:block;height:100%;width:0;background:var(--brand);transition:width .2s}
+  .usage{margin-top:12px}
+  .foot{margin-top:18px}
+  #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:10px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;max-width:90vw}
+  #toast.show{opacity:1;transform:translateX(-50%)}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand">Share<span>OnAir</span></div>
+  <div id="status" class="status"><i></i><span>Connecting…</span></div>
+</header>
+<main>
+  <nav class="tabs">
+    <button data-tab="text" class="active">Text</button>
+    <button data-tab="files">Files <b id="fileCount"></b></button>
+  </nav>
+
+  <section id="tab-text" class="panel active">
+    <textarea id="text" placeholder="Type or paste text here, then tap Save. Every device on your Wi-Fi will see it."></textarea>
+    <div class="row">
+      <span id="textInfo" class="muted"></span>
+      <div class="btns">
+        <button id="clearText" class="ghost">Clear</button>
+        <button id="copyText" class="ghost">Copy</button>
+        <button id="saveText" class="primary">Save</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="tab-files" class="panel">
+    <label id="drop" class="drop">
+      <input type="file" id="picker" multiple hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <strong>Drop files here or tap to choose</strong>
+      <span class="muted" id="limitsInfo">Up to 5 files at a time · 50 MB each</span>
+    </label>
+    <ul id="uploads"></ul>
+    <ul id="files"></ul>
+    <p id="empty" class="muted center">No files shared on this network yet.</p>
+    <div class="usage muted" id="usage"></div>
+  </section>
+
+  <p class="muted center foot">Visible to every device on the same Wi-Fi / network · everything auto-deletes after <span id="ttl">24</span> hours</p>
+</main>
+<div id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const ta = $('#text');
+let state = { text: '', files: [], limits: { maxFile: 50 * 1048576, maxFiles: 5 } };
+let dirty = false, active = 0, savedText = '';
+
+const fmt = n => { const u = ['B','KB','MB','GB']; let i = 0; while (n >= 1024 && i < 3) { n /= 1024; i++; } return (i ? n.toFixed(1) : n) + ' ' + u[i]; };
+const ago = t => { const s = (Date.now() - t) / 1000; if (s < 60) return 'just now'; if (s < 3600) return Math.floor(s / 60) + ' min ago'; return Math.floor(s / 3600) + ' h ago'; };
+const toast = m => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2600); };
+
+// Tabs
+document.querySelectorAll('.tabs button').forEach(b => b.onclick = () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.classList.toggle('active', x === b));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === 'tab-' + b.dataset.tab));
+});
+
+// ---------- Rendering ----------
+function render() {
+  const L = state.limits;
+  ta.maxLength = L.maxText || 100000;
+  if (!dirty) { ta.value = state.text; savedText = state.text; }
+  if (dirty && state.text !== savedText) {
+    $('#textInfo').textContent = 'Another device changed the text. Saving will replace it.';
+  } else {
+    $('#textInfo').textContent = dirty ? 'Unsaved changes' : (state.textUpdated ? 'Updated ' + ago(state.textUpdated) : '');
+  }
+  $('#ttl').textContent = L.ttlHours;
+  $('#limitsInfo').textContent = `Up to ${L.maxFiles} files at a time · ${fmt(L.maxFile)} each`;
+  $('#fileCount').textContent = state.files.length || '';
+  $('#empty').style.display = state.files.length ? 'none' : '';
+  $('#usage').textContent = state.files.length ? `${fmt(state.used)} of ${fmt(L.maxRoom)} used on this network` : '';
+
+  const ul = $('#files'); ul.innerHTML = '';
+  for (const f of state.files) {
+    const ext = (f.name.includes('.') ? f.name.split('.').pop() : 'file').slice(0, 4);
+    const li = document.createElement('li'); li.className = 'item';
+    li.innerHTML = `<div class="ico"></div><div class="meta"><div class="name"></div><div class="muted"></div></div>
+      <div class="acts"><a download>Download</a><button>Delete</button></div>`;
+    li.querySelector('.ico').textContent = ext;
+    li.querySelector('.name').textContent = f.name;
+    li.querySelector('.name').title = f.name;
+    li.querySelector('.muted').textContent = `${fmt(f.size)} · ${ago(f.uploaded)}`;
+    const a = li.querySelector('a'); a.href = '/api/files/' + f.id; a.setAttribute('download', f.name);
+    li.querySelector('button').onclick = async () => {
+      if (!confirm(`Delete "${f.name}" for everyone on this network?`)) return;
+      const r = await fetch('/api/files/' + f.id, { method: 'DELETE' });
+      if (!r.ok) toast('Could not delete');
+    };
+    ul.append(li);
+  }
+}
+
+function setStatus(on, devices) {
+  $('#status').classList.toggle('on', on);
+  $('#status span').textContent = on ? `${devices} device${devices === 1 ? '' : 's'} online` : 'Reconnecting…';
+}
+
+// ---------- Live updates ----------
+const es = new EventSource('/api/events');
+es.onmessage = e => { state = JSON.parse(e.data); render(); setStatus(true, state.devices); };
+es.onerror = () => setStatus(false);
+setInterval(render, 30000); // refresh "x min ago" labels
+
+// ---------- Text ----------
+ta.addEventListener('input', () => { dirty = ta.value !== state.text; render(); });
+async function saveText(text) {
+  const r = await fetch('/api/text', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
+  if (!r.ok) return toast('Could not save text');
+  dirty = false; toast(text ? 'Text shared' : 'Text cleared');
+}
+$('#saveText').onclick = () => saveText(ta.value);
+$('#clearText').onclick = () => { if (!ta.value || confirm('Clear the text for everyone on this network?')) { ta.value = ''; saveText(''); } };
+$('#copyText').onclick = async () => {
+  try { await navigator.clipboard.writeText(ta.value); }
+  catch { ta.select(); document.execCommand('copy'); }
+  toast('Copied');
+};
+document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); saveText(ta.value); } });
+
+// ---------- Files ----------
+function handle(list) {
+  let files = [...list];
+  const L = state.limits;
+  if (!files.length) return;
+  const slots = L.maxFiles - active;
+  if (slots <= 0) return toast('Please wait for the current uploads to finish');
+  if (files.length > slots) { toast(`Only ${L.maxFiles} files at a time — uploading the first ${slots}`); files = files.slice(0, slots); }
+  for (const f of files) {
+    if (f.size > L.maxFile) { toast(`"${f.name}" is over ${fmt(L.maxFile)}`); continue; }
+    upload(f);
+  }
+}
+
+function upload(f) {
+  active++;
+  const li = document.createElement('li'); li.className = 'item';
+  li.innerHTML = `<div class="ico">…</div><div class="meta"><div class="name"></div><div class="bar"><i></i></div><div class="muted">Starting…</div></div><div class="acts"><button>Cancel</button></div>`;
+  li.querySelector('.name').textContent = f.name;
+  $('#uploads').append(li);
+
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload');
+  xhr.setRequestHeader('X-File-Name', encodeURIComponent(f.name));
+  xhr.setRequestHeader('Content-Type', 'application/octet-stream');
+  xhr.upload.onprogress = e => {
+    if (!e.lengthComputable) return;
+    const pct = e.loaded / e.total * 100;
+    li.querySelector('.bar i').style.width = pct + '%';
+    li.querySelector('.muted').textContent = `${fmt(e.loaded)} of ${fmt(e.total)} · ${Math.round(pct)}%`;
+  };
+  li.querySelector('button').onclick = () => xhr.abort();
+  xhr.onloadend = () => {
+    active--; li.remove();
+    if (xhr.status === 200) return toast(`Shared "${f.name}"`);
+    if (xhr.status === 0) return toast(`Upload of "${f.name}" stopped`);
+    let m = 'Upload failed'; try { m = JSON.parse(xhr.responseText).error; } catch {}
+    toast(`"${f.name}": ${m}`);
+  };
+  xhr.send(f);
+}
+
+$('#picker').onchange = e => { handle(e.target.files); e.target.value = ''; };
+const drop = $('#drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', e => handle(e.dataTransfer.files));
+// Drop anywhere on the page switches to Files tab
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); if (!drop.contains(e.target)) { document.querySelector('[data-tab=files]').click(); handle(e.dataTransfer.files); } });
+// Paste files (e.g. screenshots) with Ctrl+V when not typing in the text box
+document.addEventListener('paste', e => { if (e.target !== ta && e.clipboardData.files.length) handle(e.clipboardData.files); });
+</script>
+</body>
+</html>
