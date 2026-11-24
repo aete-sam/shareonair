@@ -21,6 +21,7 @@ const MAX_ROOM_BYTES = MAX_ROOM_MB * 1024 * 1024;
 const TTL_MS = TTL_HOURS * 3600 * 1000;
 const DATA_DIR = path.join(__dirname, 'data');
 const INDEX_HTML = path.join(__dirname, 'public', 'index.html');
+const ASSETS_DIR = path.join(__dirname, 'public', 'assets');
 
 // ---------- Network detection ----------
 function clientIp(req) {
@@ -210,6 +211,15 @@ const server = http.createServer(async (req, res) => {
       return fs.createReadStream(INDEX_HTML).pipe(res);
     }
     if (req.method === 'GET' && p === '/health') return send(res, 200, { ok: true });
+    const asset = p.match(/^\/assets\/([\w-]+\.png)$/);
+    if (req.method === 'GET' && asset) {
+      const file = path.join(ASSETS_DIR, asset[1]);
+      return fs.stat(file, (err, st) => {
+        if (err || !st.isFile()) return send(res, 404, { error: 'Not found' });
+        res.writeHead(200, { 'Content-Type': 'image/png', 'Content-Length': st.size, 'Cache-Control': 'public, max-age=86400' });
+        fs.createReadStream(file).pipe(res);
+      });
+    }
 
     const room = getRoom(req);
 
